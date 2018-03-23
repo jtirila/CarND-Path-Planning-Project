@@ -299,6 +299,30 @@ vector<vector<double>> generateTrajectory(
 
 }
 
+
+double cost(vector<vector<double>> trajectory, bool lane_change_involved){
+  int size = trajectory[0].size();
+  double x_dist = trajectory[0][size - 1] - trajectory[0][0];
+  double y_dist = trajectory[1][size - 1] - trajectory[1][0];
+  double abs_dist = x_dist * x_dist + y_dist * y_dist;
+
+  return -abs_dist + 40 * (int) lane_change_involved;
+}
+
+vector<vector<double>> ChooseBestTrajectory(vector<vector<vector<double>>>& trajectories, vector<bool> lane_change_involved){
+  // TODO: no need to keep index, can keep vector directly?
+  int chosen_index = 0;
+  double min_cost = cost(trajectories[0], lane_change_involved[0]);
+  for(int i = 1; i < trajectories.size(); i++){
+    double current_cost = cost(trajectories[i], lane_change_involved[i]);
+    if(current_cost < min_cost){
+      chosen_index = i;
+      min_cost = current_cost;
+    }
+  }
+  return trajectories[chosen_index];
+}
+
 int main() {
   uWS::Hub h;
 
@@ -363,6 +387,7 @@ int main() {
          	double car_x = j[1]["x"];
          	double car_y = j[1]["y"];
          	double car_s = j[1]["s"];
+          double car_s_original = car_s;
          	double car_d = j[1]["d"];
          	double car_yaw = j[1]["yaw"];
          	double car_speed = j[1]["speed"];
@@ -397,6 +422,7 @@ int main() {
             double vy = sensor_fusion[i][4];
             double check_speed = sqrt(vx * vx + vy * vy);
             double check_car_s = sensor_fusion[i][5];
+            double check_car_s_original = check_car_s;
 
             if(d < (2 + 4 * lane + 2) && d > (2 + 4 * lane - 2)){
               check_car_s += ((double)prev_size * 0.02 * check_speed ); // if using previous points can project s value outwards in time
@@ -409,7 +435,7 @@ int main() {
 
             // Check if a car is going to be dangerously close on the left or right
             } else  {
-              bool adjacent_car_too_close = abs(check_car_s - car_s) < 30;
+              bool adjacent_car_too_close = abs(check_car_s_original - car_s_original) < 15;
               if(d <= (2 + 4 * lane - 2)){
                 if(adjacent_car_too_close) {
                   left_lane_safe = false;
@@ -423,10 +449,6 @@ int main() {
             }
           }
 
-          if(too_close){
-            // Do nothint a this point
-          }
-
           vector<double> previous_path_x_doubles;
           vector<double> previous_path_y_doubles;
 
@@ -435,12 +457,50 @@ int main() {
             previous_path_y_doubles.push_back(previous_path_y[i]);
           }
 
+          vector<vector<vector<double>>> next_trajectories;
+          vector<bool> lane_change_involved;
 
-          auto next_vals = generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane, previous_path_x_doubles,
-                                         previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+          if(!too_close){
+            if(ref_vel < 49.0){
+              ref_vel += 0.5;
+            }
+            next_trajectories.push_back(generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane, previous_path_x_doubles,
+                                                previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
+            lane_change_involved.push_back(false);
+          }
+          if(left_lane_safe) {
+            if(lane != 0) {
+              next_trajectories.push_back(
+                  generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane - 1, previous_path_x_doubles,
+                                     previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
+              lane_change_involved.push_back(true);
+            }
 
-          auto next_x_vals = next_vals[0];
-          auto next_y_vals = next_vals[1];
+          }
+
+          if(right_lane_safe){
+            if(lane != 2) {
+              next_trajectories.push_back(
+                  generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane + 1, previous_path_x_doubles,
+                                     previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
+              lane_change_involved.push_back(true);
+            }
+          }
+          if(too_close && !(left_lane_safe || right_lane_safe)){
+            ref_vel -= 0.5;
+            next_trajectories.push_back(
+                generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane, previous_path_x_doubles,
+                                   previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
+            lane_change_involved.push_back(false);
+
+          }
+
+          // TODO: pick the trajectory with the lowest cost
+          vector<vector<double>> best_trajectory = ChooseBestTrajectory(next_trajectories, lane_change_involved);
+
+
+          auto next_x_vals = best_trajectory[0];
+          auto next_y_vals = best_trajectory[1];
 
          	json msgJson;
 
