@@ -168,7 +168,8 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 vector<vector<double>> generateTrajectory(
     double car_x, double car_y, double car_yaw, double car_s, double ref_vel,
     int lane,
-    vector<double>& previous_path_x, vector<double>& previous_path_y,
+    nlohmann::basic_json<std::__1::basic_string, bool, long, long, unsigned long long, double> previous_path_x,
+    nlohmann::basic_json<std::__1::basic_string, bool, long, long, unsigned long long, double> previous_path_y,
     vector<double>& map_waypoints_s, vector<double>& map_waypoints_x, vector<double>& map_waypoints_y) {
 
   // Create a list of widely spaced (x,y) waypoints, evenly spaced at 30m
