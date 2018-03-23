@@ -168,8 +168,8 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 vector<vector<double>> generateTrajectory(
     double car_x, double car_y, double car_yaw, double car_s, double ref_vel,
     int lane,
-    nlohmann::basic_json<std::__1::basic_string, bool, long, long, unsigned long long, double> previous_path_x,
-    nlohmann::basic_json<std::__1::basic_string, bool, long, long, unsigned long long, double> previous_path_y,
+    vector<double> previous_path_x,
+    vector<double> previous_path_y,
     vector<double>& map_waypoints_s, vector<double>& map_waypoints_x, vector<double>& map_waypoints_y) {
 
   // Create a list of widely spaced (x,y) waypoints, evenly spaced at 30m
@@ -427,9 +427,17 @@ int main() {
             // Do nothint a this point
           }
 
+          vector<double> previous_path_x_doubles;
+          vector<double> previous_path_y_doubles;
 
-          auto next_vals = generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane, previous_path_x,
-                                         previous_path_y, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+          for(int i = 0; i < previous_path_x.size(); i++){
+            previous_path_x_doubles.push_back(previous_path_x[i]);
+            previous_path_y_doubles.push_back(previous_path_y[i]);
+          }
+
+
+          auto next_vals = generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane, previous_path_x_doubles,
+                                         previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
           auto next_x_vals = next_vals[0];
           auto next_y_vals = next_vals[1];
