@@ -170,11 +170,11 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 }
 
 vector<vector<double>> generateTrajectory(
-    double car_x, double car_y, double car_yaw, double car_s, double ref_vel,
-    int lane,
-    vector<double> previous_path_x,
-    vector<double> previous_path_y,
-    vector<double>& map_waypoints_s, vector<double>& map_waypoints_x, vector<double>& map_waypoints_y) {
+  double car_x, double car_y, double car_yaw, double car_s, double ref_vel,
+  int lane,
+  vector<double> previous_path_x,
+  vector<double> previous_path_y,
+  vector<double>& map_waypoints_s, vector<double>& map_waypoints_x, vector<double>& map_waypoints_y) {
 
   // Create a list of widely spaced (x,y) waypoints, evenly spaced at 30m
   // Later we will interpolate these waypoints with a spline and fill it in with more points that
@@ -250,9 +250,9 @@ vector<vector<double>> generateTrajectory(
   }
 
 
-  for (int i = 0; i < ptsx.size(); i++){
-    cout << "ptsx[" << i << "]: " << ptsx[i] << "\n";
-  }
+  // for (int i = 0; i < ptsx.size(); i++){
+  //   cout << "ptsx[" << i << "]: " << ptsx[i] << "\n";
+  // }
   // Create a spline
   tk::spline s;
 
@@ -309,8 +309,9 @@ double cost(vector<vector<double>> trajectory, int next_lane, int lane){
   double x_dist = trajectory[0][size - 1] - trajectory[0][0];
   double y_dist = trajectory[1][size - 1] - trajectory[1][0];
   double abs_dist = x_dist * x_dist + y_dist * y_dist;
+  double lane_change = (double) (next_lane != lane);
 
-  return -abs_dist + 100 * (int) (next_lane == lane);
+  return -abs_dist + 100 * (double) lane_change;
 }
 
 TrajectoryAndLane ChooseBestTrajectory(vector<vector<vector<double>>>& trajectories, vector<int> next_lanes, int lane){
@@ -432,35 +433,51 @@ int main() {
             double check_car_s_original = check_car_s;
             check_car_s += ((double)prev_size * 0.02 * check_speed ); // if using previous points can project s value outwards in time
 
-            if(abs(d - end_path_d) < 3) {
+            // If the observed car is in our intended lane or in the same lane as we are now and we don't intend to change lanes.
+            bool check_car_in_intended_lane = abs(d - 2 - 4 * lane) < 2.5;
+
+            if(check_car_in_intended_lane) {
               // check s values greater than mine and s gap
-              if(check_car_s > car_s && (check_car_s - car_s < 30)) {
-                // Do some logic here, lower reference velocity so we don't run into the car in front of us.
-                // The action could also be flag to indicate a desired lane change
-                too_close = true;
+              if(check_car_s > car_s) {
+                if(check_car_s - car_s < 30) {
+                  too_close = true;
+                }
+              } else {
+                if(car_s - check_car_s < 8) {
+
+                } else if (car_s - check_car_s < 20 && check_speed - ref_vel > 10) {
+                  too_close = true;
+                }
               }
-
             // Check if a car is going to be dangerously close on the left or right
-            } else  {
-              bool adjacent_car_too_close = (0 < check_car_s_original - car_s_original &&
-                                                 check_car_s_original - car_s_original < 30) ||
-                                            (0 <  car_s_original - check_car_s_original &&
-                                                  car_s_original - check_car_s_original < 20) ||
-                                            (0 < check_car_s - car_s &&
-                                                 check_car_s - car_s < 20) ||
-                                            (0 < car_s - check_car_s &&
-                                                 car_s - check_car_s  < 30);
-              cout << "Adjacent_car_too_close: " << adjacent_car_too_close << "\n";
+              if(too_close) {
+                cout << "Too close!" << "\n";
+              }
+            }
 
-              if(end_path_d - d < 3 && end_path_d - d > 0 ){
-                if(adjacent_car_too_close) {
-                  left_lane_safe = false;
-                }
+            bool adjacent_car_too_close = (-20 < check_car_s - car_s &&
+                                               check_car_s - car_s < 20) ||
+                                          (0 < car_s - check_car_s &&
+                                               car_s - check_car_s  < 30);
+            // cout << "Adjacent_car_too_close: " << adjacent_car_too_close << "\n";
 
-              } else if(d - end_path_d > 0 && d - end_path_d < 3) {
-                if(adjacent_car_too_close) {
-                  right_lane_safe = false;
-                }
+            bool check_car_on_left = (2 + lane * 4 - d < 2.0 && 2 + lane * 4 - d > 0);
+            bool check_car_on_right = (2 + lane * 4 - d <= 0 && 2 + lane * 4 - d > -2.0);
+            if(check_car_on_left) {
+              cout << "Car on left\n";
+            }
+            if(check_car_on_right) {
+              cout << "Car on right\n";
+            }
+            if(check_car_on_left){
+              if(adjacent_car_too_close) {
+                left_lane_safe = false;
+                cout << "left_lane_unsafe: " << left_lane_safe << "\n";
+              }
+            } else if(check_car_on_right){
+              if(adjacent_car_too_close) {
+                right_lane_safe = false;
+                cout << "right_lane_unsafe: " << right_lane_safe << "\n";
               }
             }
           }
@@ -484,26 +501,23 @@ int main() {
                                                 previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
             next_lanes.push_back(lane);
           }
-          if(left_lane_safe) {
-            if(lane != 0) {
-              next_trajectories.push_back(
-                  generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane - 1, previous_path_x_doubles,
-                                     previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
-              next_lanes.push_back(lane - 1);
-            }
-
+          // If we can go to the left safely
+          if(left_lane_safe && lane != 0) {
+            next_trajectories.push_back(
+                generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane - 1, previous_path_x_doubles,
+                                   previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
+            next_lanes.push_back(lane - 1);
           }
 
-          if(right_lane_safe){
-            if(lane != 2) {
-              next_trajectories.push_back(
-                  generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane + 1, previous_path_x_doubles,
-                                     previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
-              next_lanes.push_back(lane + 1);
-            }
+          // If we can go to the right safely
+          if(right_lane_safe && lane != 2){
+            next_trajectories.push_back(
+                generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane + 1, previous_path_x_doubles,
+                                   previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
+            next_lanes.push_back(lane + 1);
           }
           if(too_close && !(left_lane_safe || right_lane_safe)){
-            ref_vel -= 1.0;
+            ref_vel -= 0.5;
             next_trajectories.push_back(
                 generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane, previous_path_x_doubles,
                                    previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
@@ -515,6 +529,7 @@ int main() {
           TrajectoryAndLane trajectory_and_lane = ChooseBestTrajectory(next_trajectories, next_lanes, lane);
           lane = trajectory_and_lane.lane;
           vector<vector<double>> best_trajectory = trajectory_and_lane.trajectory;
+          cout << "Chosen lane: " << lane << "\n";
 
 
           auto next_x_vals = best_trajectory[0];
