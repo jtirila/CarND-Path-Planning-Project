@@ -468,7 +468,6 @@ int main() {
             check_car_s += ((double)prev_size * 0.02 * check_speed / 2.24 );
 
             // Declare some flags to keep track of various possible states of nearby cars
-            // TODO: this is wrong, the 'intended lane' is only determined later on
             bool check_car_in_intended_lane = abs(check_car_d - 2 - 4 * lane) < 2.5;
             bool too_close_ahead_projected = false;
             bool too_close_behind_projected = false;
