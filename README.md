@@ -180,6 +180,33 @@ A well written README file can enhance your project and portfolio.  Develop your
 
 ### Rubric points
 
+#### Path Generation
+
+#### Determinging Which Action are Safe
+
+Determine all the actions that are safe: 
+ * Safe to go straight ahead?
+ * Safe to change to the lane on the left - also considers the possibility 
+   of already being on the leftmost lane, in which case a change to the left 
+   is not safe
+ * A similar consideration about changing lanes to the right
+ * Finally, if none of these options is safe , we'll just have to slow down 
+   in the current lane 
+   
+#### Generating the Trajectories
+
+#### Choosing the Best Trajectory
+
+Once the trajectories have been generated, we need to pick the one that we 
+will want to follow. The choice is made using a _cost function_. 
+
+
+
+   
+
+
+
+
 > The car is able to drive at least 4.32 miles without incident..
 > 
 > The top right screen of the simulator shows the current/best miles driven without incident. Incidents include exceeding acceleration/jerk/speed, collision, and driving outside of the lanes. Each incident case is also listed below in more detail.
@@ -191,7 +218,7 @@ A well written README file can enhance your project and portfolio.  Develop your
 > Max Acceleration and Jerk are not Exceeded.
 > 
 > The car does not exceed a total acceleration of 10 m/s^2 and a jerk of 10 m/s^3.
-> 
+
 > Car does not have collisions.
 > 
 > The car must not come into contact with any of the other cars on the road.
