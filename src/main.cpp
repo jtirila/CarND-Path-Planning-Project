@@ -11,6 +11,11 @@
 #include "spline.h"
 
 
+double RAW_DISTANCE_THRESHOLD_AHEAD = 26.0;
+double RAW_DISTANCE_THRESHOLD_BEHIND= 10.0;
+double DISTANCE_WITH_SPEED_THRESHOLD_AHEAD = 50.0;
+double DISTANCE_WITH_SPEED_THRESHOLD_BEHIND= 15.0;
+double SPEED_DIFF_THRESHOLD = 10.0;
 
 using namespace std;
 
@@ -304,6 +309,14 @@ vector<vector<double>> generateTrajectory(
 }
 
 
+/* 
+ * The cost function. The function is very simple due to the fact that infeasible 
+ * paths are eliminated in advance. Hence, the cost function just considers distance
+ * travelled and the amount of lane changes.  
+ *
+ * The cost function prefers paths where lanes are not changed excessively, and the car
+ * is able to drive a maximum distance. 
+ */
 double cost(vector<vector<double>> trajectory, int next_lane, int lane){
   int size = trajectory[0].size();
   double x_dist = trajectory[0][size - 1] - trajectory[0][0];
@@ -314,6 +327,12 @@ double cost(vector<vector<double>> trajectory, int next_lane, int lane){
   return -abs_dist + 300 * (double) lane_change;
 }
 
+
+/* 
+ * A helper function to choose the best one from the generated trajectories. Also, 
+ * each trajectory is associated with
+ * a related lane so that we can consider lane changes in the cost function. 
+ */
 TrajectoryAndLane ChooseBestTrajectory(vector<vector<vector<double>>>& trajectories, vector<int> next_lanes, int lane){
   // TODO: no need to keep index, can keep vector directly?
   int chosen_index = 0;
@@ -369,7 +388,7 @@ int main() {
   }
 
   int lane = 1;
-  double ref_vel = 49.5;
+  double ref_vel = 0.0;
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&lane,&ref_vel](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -422,6 +441,7 @@ int main() {
           bool straight_ahead_safe = true;
           bool left_lane_safe = true;
           bool right_lane_safe = true;
+          double too_close_ahead_max_speed_diff = 0.0;
 
 
           // A loop where we determine whether is it safe to proceed
@@ -443,8 +463,11 @@ int main() {
 
             // Is the observed car is in our intended lane?
             bool check_car_in_intended_lane = abs(d - 2 - 4 * lane) < 2.5;
-            bool too_close_projected = false;
-            bool too_close_now = false;
+            bool too_close_ahead_projected = false;
+            bool too_close_behind_projected = false;
+            bool too_close_ahead_now = false;
+            bool too_close_behind_now = false;
+            double speed_diff;
             bool too_close;
 
             cout << "Observed car! "
@@ -458,35 +481,51 @@ int main() {
 
             // check s values greater than mine and s gap
             if(check_car_s > car_s) {
-              if(check_car_s - car_s < 44) {
-                too_close_projected = true;
-              } else if (check_car_s - car_s < 54 && car_speed - check_speed > 10){
-                too_close_projected = true;
+              if(check_car_s - car_s < RAW_DISTANCE_THRESHOLD_AHEAD) {
+                too_close_ahead_projected = true;
+                speed_diff = car_speed - check_speed;
+                if(speed_diff > too_close_ahead_max_speed_diff) {
+                  too_close_ahead_max_speed_diff = speed_diff;
+                }
+              } else if (check_car_s - car_s < DISTANCE_WITH_SPEED_THRESHOLD_AHEAD && car_speed - check_speed > SPEED_DIFF_THRESHOLD){
+                too_close_ahead_projected = true;
+                speed_diff = car_speed - check_speed;
+                if(speed_diff > too_close_ahead_max_speed_diff) {
+                  too_close_ahead_max_speed_diff = speed_diff;
+                }
               }
             } else {
-              if(car_s - check_car_s < 44) {
-                too_close_projected = true;
-              } else if (car_s - check_car_s < 54 && check_speed - car_speed > 10) {
-                too_close_projected = true;
+              if(car_s - check_car_s < RAW_DISTANCE_THRESHOLD_BEHIND) {
+                too_close_behind_projected = true;
+              } else if (car_s - check_car_s < DISTANCE_WITH_SPEED_THRESHOLD_BEHIND && check_speed - car_speed > SPEED_DIFF_THRESHOLD) {
+                too_close_ahead_projected = true;
               }
             }
 
             if(check_car_s_original > car_s_original) {
-              if(check_car_s_original - car_s_original < 44) {
-                too_close_now = true;
-              } else if (check_car_s_original - car_s_original < 54 && car_speed - check_speed > 10){
-                too_close_now = true;
+              if(check_car_s_original - car_s_original < RAW_DISTANCE_THRESHOLD_AHEAD) {
+                too_close_ahead_now = true;
+                speed_diff = car_speed - check_speed;
+                if(speed_diff > too_close_ahead_max_speed_diff) {
+                  too_close_ahead_max_speed_diff = speed_diff;
+                }
+              } else if (check_car_s_original - car_s_original < DISTANCE_WITH_SPEED_THRESHOLD_AHEAD && car_speed - check_speed > SPEED_DIFF_THRESHOLD){
+                too_close_ahead_now = true;
+                speed_diff = car_speed - check_speed;
+                if(speed_diff > too_close_ahead_max_speed_diff) {
+                  too_close_ahead_max_speed_diff = speed_diff;
+                }
               }
             } else {
-              if(car_s_original - check_car_s_original < 44) {
-                too_close_now = true;
-              } else if (car_s_original - check_car_s_original < 54 && check_speed - car_speed > 10) {
-                too_close_now = true;
+              if(car_s_original - check_car_s_original < RAW_DISTANCE_THRESHOLD_BEHIND) {
+                too_close_behind_now = true;
+              } else if (car_s_original - check_car_s_original < DISTANCE_WITH_SPEED_THRESHOLD_BEHIND && check_speed - car_speed > SPEED_DIFF_THRESHOLD) {
+                too_close_behind_now = true;
               }
             }
 
 
-            too_close = too_close_now || too_close_projected;
+            too_close = too_close_ahead_now || too_close_ahead_projected || too_close_behind_now || too_close_behind_projected;
 
             if(too_close && check_car_in_intended_lane) {
 
@@ -503,9 +542,9 @@ int main() {
 
 
             // Check if a car is going to be dangerously close on the left or right
-
-            bool check_car_on_left = too_close && (2 + (lane - 1) * 4 - d < 2.0 && 2 + (lane - 1) * 4 - d > 0.0);
-            bool check_car_on_right = too_close &&  (2 + (lane + 1) * 4 - d <= 0 && 2 + (lane + 1) * 4 - d > -2.0);
+            cout << "Too close: " << too_close << "\n";
+            bool check_car_on_left = too_close && ((2 + (lane - 1) * 4 - d < 2.0) && (2 + (lane - 1) * 4 - d > -2.0));
+            bool check_car_on_right = too_close && ((2 + (lane + 1) * 4 - d < 2.0) && (2 + (lane + 1) * 4 - d > -2.0));
 
             if(check_car_on_left) {
 
@@ -529,11 +568,10 @@ int main() {
                    << "; check_speed: " << check_speed << "\n";
             }
 
-            if(lane == 0 || (check_car_on_left && too_close)){
-              if(lane == 0 || too_close) {
-                left_lane_safe = false;
-              }
-            } else if(lane == 2 || (check_car_on_right && too_close)){
+            if(lane == 0 || (check_car_on_left)) {
+              left_lane_safe = false;
+            }
+            if(lane == 2 || (check_car_on_right)){
               right_lane_safe = false;
             }
           }
@@ -581,7 +619,9 @@ int main() {
           }
           if(!(straight_ahead_safe || left_lane_safe || right_lane_safe)){
             cout << "No safe options other than slow down on lane " << lane << "\n";
-            ref_vel -= 0.5;
+            if(too_close_ahead_max_speed_diff > 0.0){
+              ref_vel -= 0.5;
+            }
             next_trajectories.push_back(
                 generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane, previous_path_x_doubles,
                                    previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
