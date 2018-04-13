@@ -12,11 +12,12 @@
 
 bool DEBUG = true;
 
-double RAW_DISTANCE_THRESHOLD_AHEAD = 26.0;
-double RAW_DISTANCE_THRESHOLD_BEHIND= 10.0;
-double DISTANCE_WITH_SPEED_THRESHOLD_AHEAD = 50.0;
-double DISTANCE_WITH_SPEED_THRESHOLD_BEHIND= 15.0;
-double SPEED_DIFF_THRESHOLD = 10.0;
+double RAW_DISTANCE_THRESHOLD_AHEAD = 20.0;
+double RAW_DISTANCE_THRESHOLD_BEHIND = 8.0;
+double DISTANCE_WITH_SPEED_THRESHOLD_AHEAD = 32.0;
+double DISTANCE_WITH_SPEED_THRESHOLD_BEHIND = 13.0;
+double CHECK_CAR_LATERAL_THRESHOLD = 2.7;
+double SPEED_DIFF_THRESHOLD = 15.0;
 
 using namespace std;
 
@@ -512,7 +513,7 @@ int main() {
               }
             }
 
-            // check car ahead of us and too close in terms of current location?
+            // check car ahead of us and too close in terms of current locations?
             if(check_car_s_original > car_s_original) {
               if(check_car_s_original - car_s_original < RAW_DISTANCE_THRESHOLD_AHEAD) {
                 too_close_ahead_now = true;
@@ -562,14 +563,13 @@ int main() {
 
             // Check if a car is going to be dangerously close on the left or right
             bool check_car_on_left = too_close && (
-              (2 + (lane - 1) * 4 - check_car_d < 2.0) &&
-              (2 + (lane - 1) * 4 - check_car_d > -2.0)
+              (2 + (lane - 1) * 4 - check_car_d < CHECK_CAR_LATERAL_THRESHOLD) &&
+              (2 + (lane - 1) * 4 - check_car_d > -CHECK_CAR_LATERAL_THRESHOLD)
             );
             bool check_car_on_right = too_close && (
-              (2 + (lane + 1) * 4 - check_car_d < 2.0) &&
-              (2 + (lane + 1) * 4 - check_car_d > -2.0)
+              (2 + (lane + 1) * 4 - check_car_d < CHECK_CAR_LATERAL_THRESHOLD) &&
+              (2 + (lane + 1) * 4 - check_car_d > -CHECK_CAR_LATERAL_THRESHOLD)
             );
-
             // Print some diagnostic info if in DEBUG mode
             if (DEBUG) {
               if(check_car_on_left) {
