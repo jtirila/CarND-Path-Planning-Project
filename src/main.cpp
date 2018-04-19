@@ -19,6 +19,8 @@ double DISTANCE_WITH_SPEED_THRESHOLD_BEHIND = 13.0;
 double CHECK_CAR_LATERAL_THRESHOLD = 2.7;
 double SPEED_DIFF_THRESHOLD = 15.0;
 
+double OBSTACLE_DISTANCE_THRESHOLD = 100;
+
 using namespace std;
 
 struct TrajectoryAndLane {vector<vector<double>> trajectory; int lane;};
@@ -317,16 +319,16 @@ vector<vector<double>> generateTrajectory(
  * travelled and the amount of lane changes.  
  *
  * The cost function prefers paths where lanes are not changed excessively, and the car
- * is able to drive a maximum distance. 
+ * is able to drive a maximum distance.
  */
-double cost(vector<vector<double>> trajectory, int next_lane, int lane){
+double cost(vector<vector<double>> trajectory, int next_lane, bool next_lane_no_obstacles, int lane){
   int size = trajectory[0].size();
   double x_dist = trajectory[0][size - 1] - trajectory[0][0];
   double y_dist = trajectory[1][size - 1] - trajectory[1][0];
   double abs_dist = x_dist * x_dist + y_dist * y_dist;
-  double lane_change = (double) (next_lane != lane);
+  double lane_change = double (next_lane != lane);
 
-  return -abs_dist + 300 * (double) lane_change;
+  return -abs_dist - 1000 * double(next_lane_no_obstacles) + 300 * lane_change ;
 }
 
 
@@ -335,13 +337,14 @@ double cost(vector<vector<double>> trajectory, int next_lane, int lane){
  * each trajectory is associated with
  * a related lane so that we can consider lane changes in the cost function. 
  */
-TrajectoryAndLane ChooseBestTrajectory(vector<vector<vector<double>>>& trajectories, vector<int> next_lanes, int lane){
+TrajectoryAndLane ChooseBestTrajectory(vector<vector<vector<double>>>& trajectories, vector<int> next_lanes,
+                                       vector<bool> next_lanes_no_obstacles, int lane){
   // TODO: no need to keep index, can keep vector directly?
   int chosen_index = 0;
   int chosen_lane = next_lanes[0];
-  double min_cost = cost(trajectories[0], next_lanes[0], lane);
+  double min_cost = cost(trajectories[0], next_lanes[0], next_lanes_no_obstacles[0], lane);
   for(int i = 1; i < trajectories.size(); i++){
-    double current_cost = cost(trajectories[i], next_lanes[i], lane);
+    double current_cost = cost(trajectories[i], next_lanes[i], next_lanes_no_obstacles[0], lane);
     if(current_cost < min_cost){
       chosen_index = i;
       min_cost = current_cost;
@@ -444,6 +447,10 @@ int main() {
           // close straight ahead, keep track of the maximum speed difference to the ego vehicle
           bool straight_ahead_safe = true;
           bool left_lane_safe = true;
+          bool left_lane_no_obstacles = true;
+          bool right_lane_no_obstacles = true;
+          bool far_left_lane_no_obstacles = true;
+          bool far_right_lane_no_obstacles = true;
           bool right_lane_safe = true;
           double too_close_ahead_max_speed_diff = 0.0;
 
@@ -474,6 +481,7 @@ int main() {
             bool too_close_behind_projected = false;
             bool too_close_ahead_now = false;
             bool too_close_behind_now = false;
+            bool is_soft_obstacle = false;
             double speed_diff;
             bool too_close;
 
@@ -502,6 +510,8 @@ int main() {
                 if(speed_diff > too_close_ahead_max_speed_diff) {
                   too_close_ahead_max_speed_diff = speed_diff;
                 }
+              } else if (check_car_s - car_s < OBSTACLE_DISTANCE_THRESHOLD){
+                is_soft_obstacle = true;
               }
 
             // check car behind us and too close in terms of projected locations?
@@ -509,7 +519,7 @@ int main() {
               if(car_s - check_car_s < RAW_DISTANCE_THRESHOLD_BEHIND) {
                 too_close_behind_projected = true;
               } else if (car_s - check_car_s < DISTANCE_WITH_SPEED_THRESHOLD_BEHIND && check_speed - car_speed > SPEED_DIFF_THRESHOLD) {
-                too_close_ahead_projected = true;
+                too_close_behind_projected = true;
               }
             }
 
@@ -526,6 +536,8 @@ int main() {
                 speed_diff = car_speed - check_speed;
                 if(speed_diff > too_close_ahead_max_speed_diff) {
                   too_close_ahead_max_speed_diff = speed_diff;
+                } else if (check_car_s_original - car_s_original < OBSTACLE_DISTANCE_THRESHOLD){
+                  is_soft_obstacle = true;
                 }
               }
             // check car behind us and too close in terms of current locations?
@@ -562,16 +574,58 @@ int main() {
             }
 
             // Check if a car is going to be dangerously close on the left or right
-            bool check_car_on_left = too_close && (
+            bool check_car_on_left = (
               (2 + (lane - 1) * 4 - check_car_d < CHECK_CAR_LATERAL_THRESHOLD) &&
               (2 + (lane - 1) * 4 - check_car_d > -CHECK_CAR_LATERAL_THRESHOLD)
             );
-            bool check_car_on_right = too_close && (
-              (2 + (lane + 1) * 4 - check_car_d < CHECK_CAR_LATERAL_THRESHOLD) &&
-              (2 + (lane + 1) * 4 - check_car_d > -CHECK_CAR_LATERAL_THRESHOLD)
+
+            bool check_car_on_far_left = (
+                (2 + (lane - 2) * 4 - check_car_d < CHECK_CAR_LATERAL_THRESHOLD) &&
+                (2 + (lane - 2) * 4 - check_car_d > -CHECK_CAR_LATERAL_THRESHOLD)
             );
+
+            bool check_car_on_right =  (
+                (2 + (lane + 1) * 4 - check_car_d < CHECK_CAR_LATERAL_THRESHOLD) &&
+                (2 + (lane + 1) * 4 - check_car_d > -CHECK_CAR_LATERAL_THRESHOLD)
+            );
+
+
+            bool check_car_on_far_right = (
+                (2 + (lane + 2) * 4 - check_car_d < CHECK_CAR_LATERAL_THRESHOLD) &&
+                (2 + (lane + 2) * 4 - check_car_d > -CHECK_CAR_LATERAL_THRESHOLD)
+            );
+
+
+            bool check_car_on_left_soft = is_soft_obstacle || check_car_on_left;
+            bool check_car_on_right_soft = is_soft_obstacle || check_car_on_right;
+
+            if(is_soft_obstacle){
+              if(check_car_on_left){
+                left_lane_no_obstacles = false;
+              }
+
+              if(check_car_on_right){
+                right_lane_no_obstacles = false;
+              }
+            }
+
+            if(is_soft_obstacle || too_close){
+              if(check_car_on_far_left) {
+                far_left_lane_no_obstacles = false;
+              }
+              if(check_car_on_far_right) {
+                far_right_lane_no_obstacles = false;
+              }
+            }
+
+
+            check_car_on_left =  too_close && check_car_on_left;
+            check_car_on_right =  too_close && check_car_on_right;
+
             // Print some diagnostic info if in DEBUG mode
             if (DEBUG) {
+              cout << "Left lane no obstacles: " << (left_lane_safe && left_lane_no_obstacles) << "\n";
+              cout << "Right lane no obstacles: " << (right_lane_safe && right_lane_no_obstacles) << "\n";
               if(check_car_on_left) {
                 cout << "Car on left! Lane: " << lane
                      << "; check_car_d: " << check_car_d
@@ -619,6 +673,7 @@ int main() {
           }
           vector<vector<vector<double>>> next_trajectories;
           vector<int> next_lanes;
+          vector<bool> next_lanes_no_obstacles;
 
           // Increase target speed if we are going slowly and there is at least one safe driving option
           if((straight_ahead_safe || left_lane_safe || right_lane_safe) && ref_vel < 49.0){
@@ -629,9 +684,13 @@ int main() {
             if(DEBUG) {
               cout << "OK to go straight ahead on lane " << lane << "; generating corresponding trajectory\n";
             }
-            next_trajectories.push_back(generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane, previous_path_x_doubles,
-                                                previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
+            next_trajectories.push_back(
+                generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane,
+                                   previous_path_x_doubles,
+                                   previous_path_y_doubles, map_waypoints_s, map_waypoints_x,
+                                   map_waypoints_y));
             next_lanes.push_back(lane);
+            next_lanes_no_obstacles.push_back(false);
           }
           // If we can go to the left safely
           if(left_lane_safe) {
@@ -640,9 +699,11 @@ int main() {
               cout << "OK to go to the left (lane " << this_lane << "); generating corresponding trajectory\n";
             }
             next_trajectories.push_back(
-                generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, this_lane, previous_path_x_doubles,
+                generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, this_lane,
+                                   previous_path_x_doubles,
                                    previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
             next_lanes.push_back(this_lane);
+            next_lanes_no_obstacles.push_back(left_lane_no_obstacles);
           }
 
           // If we can go to the right safely
@@ -652,9 +713,11 @@ int main() {
               cout << "OK to go to the right (lane " << this_lane << "); generating corresponding trajectory\n";
             }
             next_trajectories.push_back(
-                generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, this_lane, previous_path_x_doubles,
-                                   previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
+                generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, this_lane,
+                                   previous_path_x_doubles, previous_path_y_doubles, map_waypoints_s,
+                                   map_waypoints_x, map_waypoints_y));
             next_lanes.push_back(this_lane);
+            next_lanes_no_obstacles.push_back(right_lane_no_obstacles);
           }
           if(!(straight_ahead_safe || left_lane_safe || right_lane_safe)){
             if(DEBUG) {
@@ -666,15 +729,20 @@ int main() {
             if(too_close_ahead_max_speed_diff > 0.0){
               ref_vel -= 0.5;
             }
+            if(((lane == 0 && far_right_lane_no_obstacles) || (lane == 2 && far_left_lane_no_obstacles)) && ref_vel > 10.0){
+              ref_vel -= 0.5;
+            }
             next_trajectories.push_back(
-                generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane, previous_path_x_doubles,
-                                   previous_path_y_doubles, map_waypoints_s, map_waypoints_x, map_waypoints_y));
+                generateTrajectory(car_x, car_y, car_yaw, car_s, ref_vel, lane,
+                                   previous_path_x_doubles, previous_path_y_doubles, map_waypoints_s,
+                                   map_waypoints_x, map_waypoints_y));
             next_lanes.push_back(lane);
+            next_lanes_no_obstacles.push_back(false);
 
           }
 
           // pick the trajectory with the lowest cost
-          TrajectoryAndLane trajectory_and_lane = ChooseBestTrajectory(next_trajectories, next_lanes, lane);
+          TrajectoryAndLane trajectory_and_lane = ChooseBestTrajectory(next_trajectories, next_lanes, next_lanes_no_obstacles, lane);
           // Assign the new lane
           lane = trajectory_and_lane.lane;
           vector<vector<double>> best_trajectory = trajectory_and_lane.trajectory;
