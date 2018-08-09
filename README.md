@@ -48,7 +48,7 @@ upon each iteration:
    that no collision occurs  
 
 Subsequently, trajectories are generated for each of the safe options and a cost function is used to pick the most 
-efficient path. If none of the paths is safe, a fourth option is introduced: . 
+efficient path. If none of the paths is safe, a fourth option is introduced: FIXME. 
 
 Even though the finite state machine is not explicit in the solution, at every moment we choose one of the 4 states 
 just described. 
