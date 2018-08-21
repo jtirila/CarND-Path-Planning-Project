@@ -104,6 +104,11 @@ The most important considerations when building the cost functions were:
      ones having traffic.  
 
 
+## The result
+
+A recoding of a full lap around the track can be seen by clicking this YouTube link: 
+
+
 ## Reflection
 
 The performance of the car using the solution described above seems adequate for this exercise. Various improvements
