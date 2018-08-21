@@ -106,8 +106,7 @@ The most important considerations when building the cost functions were:
 
 ## The result
 
-A recoding of a full lap around the track can be seen by clicking this YouTube link: 
-
+A YouTube video recoding of a full lap around the track can be seen by clicking this image: [![Path Planning Project Video](https://img.youtube.com/vi/yppDlA60afo/0.jpg)](https://www.youtube.com/watch?v=yppDlA60afo)
 
 ## Reflection
 

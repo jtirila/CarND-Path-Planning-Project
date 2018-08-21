@@ -10,7 +10,7 @@
 #include "json.hpp"
 #include "spline.h"
 
-bool DEBUG = true;
+bool DEBUG = false;
 
 double RAW_DISTANCE_THRESHOLD_AHEAD = 20.0;
 double RAW_DISTANCE_THRESHOLD_BEHIND = 8.0;
@@ -436,7 +436,8 @@ int main() {
           // Sensor Fusion Data, a list of all other cars on the same side of the road.
           auto sensor_fusion = j[1]["sensor_fusion"];
 
-          cout << "Prev_size: " << prev_size << "\n";
+          if(DEBUG)
+            cout << "Prev_size: " << prev_size << "\n";
 
 
           if(prev_size > 0) {
@@ -569,8 +570,8 @@ int main() {
                      << "; check_car_s_original: " << check_car_s_original
                      << "; car_speed: " << car_speed
                      << "; check_speed: " << check_speed << "\n";
-                straight_ahead_safe = false;
               }
+              straight_ahead_safe = false;
             }
 
             // Check if a car is going to be dangerously close on the left or right
