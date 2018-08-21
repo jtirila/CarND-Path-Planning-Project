@@ -9,25 +9,28 @@ https://github.com/udacity/CarND-Path-Planning-Project
 
 ## Overview
 
-In this project, the task was to build a path planner along with a trajectory generation 
-strategy to navigate a vehicle along a three lane highway with traffic. Various requirements 
-concerning safe navigation and speed needs to be met to pass the project.  
+In this project, the task was to build a path planner along with strategies for trajectory generation 
+and selection to navigate a vehicle along a three lane highway with traffic. Various requirements 
+concerning safe navigation and speed need to be met to pass the project.  
    
 ## My Solution 
 
 In my solution I largely follow the strategy proposed in the project walkthrough video. Specifically, the 
 trajectories are generated using splines along desired waypoints along the road, and 
 a significant overlap between consecutive trajectory generation steps is utilized to ensure smoothness of the trajectory. 
+Udacity staff also proposes an approximate heuristic for keeping the desired target speed along the reference trajectory.
+The heuristic is employes as presented. 
 
 In addition to the proposed approach, a set of variables is introduced to keep track of vehicle state 
 and intended actions, and another set of variables and flags is used to keep track of the feasibility and efficiency 
-of the various possible choices that can be made concerning the vehicle's future path. 
+of the various possible choices that can be made concerning the vehicle's future path. This collection of variables 
+and flags constitute the state machine that controls the vehicle's possible actions. 
 
 ### Path Generation
 
 Paths are generated using a spline based solution. All the waypoints remaining from the previous iteration are 
 preserved, and new points are generated only to the extent that we always have 50 future points ready. With a typical
-setup, this typically means that only a few new waypoints need to be generated for eatch step. 
+setup, this means that only a few new waypoints need to be generated for each step. 
 This strategy, along with the usage of the spline, guarantee to an extent that the trajectories will be smooth, 
 there actions are not too sudden so that jerk remains within reasonable limits.  
 
@@ -48,7 +51,7 @@ upon each iteration:
    that no collision occurs  
 
 Subsequently, trajectories are generated for each of the safe options and a cost function is used to pick the most 
-efficient path. If none of the paths is safe, a fourth option is introduced: FIXME. 
+efficient path.
 
 Even though the finite state machine is not explicit in the solution, at every moment we choose one of the 4 states 
 just described. 
@@ -80,7 +83,7 @@ change as unsafe. Consequently, there will be not path generated for this option
 As described above, trajectories are generated using splines just as described in the project walkthrough video. 
 The documentation for the spline generation may be found in the video so I will not detail it here. 
 
-### Choosing the Best Trajectory
+### Cost Function: Choosing the Best Trajectory
 
 Once the trajectories have been generated, we need to pick the one that we 
 will want to follow. The choice is made using a _cost function_. As only a small number of trajectories are generated
@@ -145,3 +148,13 @@ To come up with such a solution using a simple FSM, a smooth path generation str
 operations would require quite a bit of twiddling with the logic, number of paths generated, and predictions 
 concerning the future locations of other vehicles in relation to one another. No attempt is made in this solution 
 into this direction. 
+
+### More Accurate Predictions for the Movements of Other Vehicles
+
+Even though the course material introduced different kinds of prediction techniques, such as the use of naive 
+Gaussian classifiers, I ended up using a simplistic kinematic model for predicting vehicle behavior. That is, 
+the positions of the other vehicles is just projected outwards in time using their current speed and longitudinal 
+location. Hence, for example, no attempt is made at detecting ongoing lance changes of other vehicles. An obvious 
+improvement to the current strategy would be to predict the state of the other vehicles in a manner somewhat similar
+to choosing the state for the ego vehicle: detecting "keep lane", "change lanes to the left" e.g. states of
+other vehicles and use those predictions to achieve a more accurate estimate of other vehicle's future locations.  
